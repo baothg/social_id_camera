@@ -1,10 +1,11 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 import 'package:social_id_camera/face_result.dart';
 import 'package:social_id_camera/loading_widget.dart';
@@ -117,27 +118,18 @@ class FaceCameraState extends State<FaceCameraPage> {
           ? const SizedBox()
           : Opacity(
               opacity: 0,
-              child: FutureBuilder<Uint8List>(
-                future: file.value!.readAsBytes(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData) {
-                    return Crop(
-                      image: snapshot.data!,
-                      controller: _cropper,
-                      fixArea: true,
-                      initialAreaBuilder: (_) => rect,
-                      onStatusChanged: (status) {
-                        if (status == CropStatus.ready && cropped == false) {
-                          _cropper.crop();
-                          cropped = true;
-                        }
-                      },
-                      onCropped: _onCropped,
-                    );
-                  } else {
-                    return const SizedBox();
+              child: Crop(
+                image: file.value!,
+                controller: _cropper,
+                fixArea: true,
+                initialAreaBuilder: (_) => rect,
+                onStatusChanged: (status) {
+                  if (status == CropStatus.ready && cropped == false) {
+                    _cropper.crop();
+                    cropped = true;
                   }
                 },
+                onCropped: _onCropped,
               ),
             );
     });
@@ -237,13 +229,18 @@ class FaceCameraState extends State<FaceCameraPage> {
   //method
   _initCamera() async {
     final cameras = await availableCameras();
-    final firstCamera = cameras.first;
-    _camera = CameraController(
-      firstCamera,
-      ResolutionPreset.medium,
-    );
-    await _camera?.initialize();
-    _cameraReady?.ready();
+    if (cameras.isNotEmpty) {
+      final frontCameras =
+          cameras.where((e) => e.lensDirection == CameraLensDirection.front);
+      final firstCamera =
+          frontCameras.isNotEmpty ? frontCameras.first : cameras.first;
+      _camera = CameraController(
+        firstCamera,
+        ResolutionPreset.medium,
+      );
+      await _camera?.initialize();
+      _cameraReady?.ready();
+    }
   }
 
   void _onCropped(Uint8List value) {
@@ -253,9 +250,16 @@ class FaceCameraState extends State<FaceCameraPage> {
 
   void _takePicture() async {
     _loader?.showLoading();
-    await _camera?.takePicture().then((v) {
+    await _camera?.takePicture().then((v) async {
       _camera?.pausePreview();
-      _file?.setValue(v);
+      final img.Image? capturedImage = img.decodeImage(await v.readAsBytes());
+      if (capturedImage != null) {
+        var flippedImage = img.flipHorizontal(capturedImage);
+        var f = File(v.path)..writeAsBytes(img.encodeJpg(flippedImage));
+        _file?.setValue(await f.readAsBytes());
+      } else {
+        _file?.setValue(await v.readAsBytes());
+      }
     });
   }
 
@@ -281,11 +285,11 @@ class FaceCameraState extends State<FaceCameraPage> {
 }
 
 class FileChangedNotifier extends ChangeNotifier {
-  XFile? _value;
+  Uint8List? _value;
 
-  XFile? get value => _value;
+  Uint8List? get value => _value;
 
-  void setValue(XFile value) {
+  void setValue(Uint8List value) {
     _value = value;
     notifyListeners();
   }

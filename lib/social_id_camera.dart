@@ -284,13 +284,18 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
   //method
   _initCamera() async {
     final cameras = await availableCameras();
-    final firstCamera = cameras.first;
-    _camera = CameraController(
-      firstCamera,
-      ResolutionPreset.medium,
-    );
-    await _camera?.initialize();
-    _cameraReady?.ready();
+    if (cameras.isNotEmpty) {
+      final backCameras =
+          cameras.where((e) => e.lensDirection == CameraLensDirection.back);
+      final firstCamera =
+          backCameras.isNotEmpty ? backCameras.first : cameras.first;
+      _camera = CameraController(
+        firstCamera,
+        ResolutionPreset.medium,
+      );
+      await _camera?.initialize();
+      _cameraReady?.ready();
+    }
   }
 
   void _onCropped(Uint8List value) {

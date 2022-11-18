@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -6,27 +5,18 @@ import 'package:camera/camera.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
+import 'package:social_id_camera/face_result.dart';
 import 'package:social_id_camera/loading_widget.dart';
 
-import 'social_id_cropper.dart';
-
-enum SocialIdCameraSide { front, back }
-
-class SocialIdCameraWidget extends StatefulWidget {
-  final SocialIdCameraSide side;
-  final Function(Uint8List image) onContinue;
-
-  const SocialIdCameraWidget(
-      {super.key, required this.side, required this.onContinue});
+class FaceCameraPage extends StatefulWidget {
+  const FaceCameraPage({super.key});
 
   @override
-  State<StatefulWidget> createState() => SocialIdCameraState();
+  State<StatefulWidget> createState() => FaceCameraState();
 }
 
-class SocialIdCameraState extends State<SocialIdCameraWidget>
-    with AutomaticKeepAliveClientMixin {
+class FaceCameraState extends State<FaceCameraPage> {
   final CropController _cropper = CropController();
   CameraReadyNotifier? _cameraReady;
   LoadingChangeNotifier? _loader;
@@ -34,24 +24,22 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
   CroppedFileChangeNotifier? _croppedFile;
   CameraController? _camera;
   bool cropped = false;
-  Rect rect = Rect.fromLTWH(0, 0, 315, 198);
-  final double cropHeight = 199;
-  final double cropRadius = 10;
-  final EdgeInsets cropPadding =
-      const EdgeInsets.only(left: 30, right: 30, top: 227, bottom: 0);
+  Rect rect = Rect.zero;
+  double cameraHeight = 0;
+  final double cameraRadius = 0;
+  final EdgeInsets cameraPadding = const EdgeInsets.only(top: 135);
 
-  String get title => widget.side == SocialIdCameraSide.front
-      ? "Ảnh mặt trước CCCD/CMND"
-      : "Ảnh mặt sau CCCD/CMND";
+  String get title => "Ảnh chụp chân dung";
 
-  String get message =>
-      "Chú ý đặt hình ảnh chứng từ vừa vào khung, có thể đọc được chữ, không bị chói sáng";
+  String get message => "Chú ý canh khuôn mặt vừa với khung hình";
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
+      cameraHeight = MediaQuery.of(context).size.width;
+      rect = Rect.fromLTWH(0, 0, cameraHeight, cameraHeight);
       _initCamera();
     });
   }
@@ -64,7 +52,6 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LoadingChangeNotifier()),
@@ -80,6 +67,9 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
         return Stack(
           children: [
             Scaffold(
+              appBar: AppBar(
+                title: Text("Ảnh chụp chân dung"),
+              ),
               floatingActionButtonLocation:
                   FloatingActionButtonLocation.centerFloat,
               floatingActionButton: _buildBottomButtons(),
@@ -88,6 +78,7 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
                   _buildCropCamera(),
                   _buildCropWidget(),
                   _buildCropImage(),
+                  _buildOvalCrop(),
                   _buildHeader(),
                 ],
               ),
@@ -105,9 +96,9 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
       return ready.isReady && croppedFile.value == null
           ? ClipPath(
               clipper: CameraViewClipper(
-                radius: cropRadius,
-                height: cropHeight,
-                padding: cropPadding,
+                radius: cameraRadius,
+                height: cameraHeight,
+                padding: cameraPadding,
                 onReactInit: (rect) => this.rect = rect,
               ),
               child: Container(
@@ -157,10 +148,10 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
       return file.value == null
           ? const SizedBox()
           : Container(
-              height: cropHeight,
-              margin: cropPadding,
+              height: cameraHeight,
+              margin: cameraPadding,
               decoration: BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(cropRadius)),
+                  borderRadius: BorderRadius.all(Radius.circular(cameraRadius)),
                   image: DecorationImage(
                       image: MemoryImage(file.value!), fit: BoxFit.contain)),
             );
@@ -169,7 +160,7 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
 
   Widget _buildHeader() {
     return SizedBox(
-      height: 227,
+      height: 140,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -215,50 +206,9 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
   }
 
   _buildTakeButtons() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: GestureDetector(
-                onTap: _showPicker,
-                child: FutureBuilder<AssetEntity?>(
-                  future: _getCurrentImage(),
-                  builder: (context, snapshot) {
-                    return Container(
-                      height: 48,
-                      width: 48,
-                      decoration: BoxDecoration(
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(4)),
-                          color: Theme.of(context).primaryColor,
-                          image: snapshot.data == null
-                              ? null
-                              : DecorationImage(
-                                  fit: BoxFit.cover,
-                                  image: AssetEntityImageProvider(
-                                    snapshot.data!,
-                                    isOriginal: false,
-                                    thumbnailSize:
-                                        const ThumbnailSize.square(200),
-                                  ))),
-                    );
-                  },
-                ),
-              ),
-            ),
-            Center(
-              child: FloatingActionButton(
-                onPressed: _takePicture,
-                child: const Icon(Icons.camera_alt_rounded),
-              ),
-            ),
-          ],
-        )
-      ],
+    return FloatingActionButton(
+      onPressed: _takePicture,
+      child: const Icon(Icons.camera_alt_rounded),
     );
   }
 
@@ -271,7 +221,10 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
         const SizedBox(width: 12),
         Expanded(
             child: ElevatedButton(
-          onPressed: () => widget.onContinue(_croppedFile!.value!),
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => FaceResultPage(data: _croppedFile!.value!)));
+          },
           style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Theme.of(context).primaryColor),
@@ -313,42 +266,17 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
     cropped = false;
   }
 
-  Future<AssetEntity?> _getCurrentImage() async {
-    List<AssetPathEntity> list = await PhotoManager.getAssetPathList(
-            type: RequestType.image, onlyAll: true)
-        .catchError((e) {
-      print(e);
+  _buildOvalCrop() {
+    return Consumer<CroppedFileChangeNotifier>(builder: (context, file, _) {
+      Color color = Colors.white.withOpacity(file.value == null ? 0.8 : 1);
+      return ClipPath(
+        clipper: OvalViewClipper(
+          height: cameraHeight,
+          padding: cameraPadding,
+        ),
+        child: Container(color: color),
+      );
     });
-    if (list.isEmpty) {
-      return null;
-    } else {
-      var items = await list.first.getAssetListRange(start: 0, end: 1);
-      if (items.isNotEmpty) {
-        return items.first;
-      } else {
-        null;
-      }
-    }
-  }
-
-  @override
-  bool get wantKeepAlive => true;
-
-  Future<void> _showPicker() async {
-    _loader?.showLoading();
-    await ImagePicker()
-        .pickImage(source: ImageSource.gallery)
-        .then((image) async {
-      await image?.readAsBytes().then((bytes) async {
-        await Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => SocialIdCropperPage(
-                  rect: rect,
-                  bytes: bytes,
-                  onCropped: _onCropped,
-                )));
-      });
-    });
-    _loader?.hideLoading();
   }
 }
 
@@ -449,6 +377,35 @@ class CameraViewClipper extends CustomClipper<Path> {
     path.addArc(Rect.fromCircle(center: brc, radius: radius.x), 0, 2 * pi);
 
     onReactInit(path.getBounds());
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper oldClipper) {
+    return true;
+  }
+}
+
+class OvalViewClipper extends CustomClipper<Path> {
+  final EdgeInsets padding;
+  final double height;
+
+  OvalViewClipper({required this.padding, required this.height});
+
+  @override
+  Path getClip(Size size) {
+    EdgeInsets pad = padding;
+
+    Path path = Path();
+    Offset center = Offset(size.width / 2.0, pad.top + height / 2);
+    double h = height * 0.7;
+    double w = height * 0.6;
+    var ovalCenter = center + const Offset(0, -20);
+    var oval = Rect.fromCenter(center: ovalCenter, height: h, width: w);
+    path.addOval(oval);
+    var rect = Rect.fromCenter(center: center, width: height, height: height);
+    path.addRect(rect);
+    path.fillType = PathFillType.evenOdd;
     return path;
   }
 

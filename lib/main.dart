@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:social_id_camera/face_camera.dart';
 import 'package:social_id_camera/social_id_cameras.dart';
 
 void main() {
@@ -36,13 +37,26 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: Center(
-        child: ElevatedButton(
-            onPressed: () async {
-              await Navigator.push(context, MaterialPageRoute(builder: (_) {
-                return const SocialIdCameraPage();
-              }));
-            },
-            child: const Text("Camera")),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) {
+                    return const SocialIdCameraPage();
+                  }));
+                },
+                child: const Text("Social Id Camera")),
+            const SizedBox(height: 40),
+            ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) {
+                    return const FaceCameraPage();
+                  }));
+                },
+                child: const Text("Face Camera")),
+          ],
+        ),
       ),
     );
   }

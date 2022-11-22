@@ -32,6 +32,7 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
   LoadingChangeNotifier? _loader;
   FileChangedNotifier? _file;
   CroppedFileChangeNotifier? _croppedFile;
+  ErrorNotifier? _error;
   CameraController? _camera;
   bool cropped = false;
   Rect rect = Rect.fromLTWH(0, 0, 315, 198);
@@ -70,13 +71,15 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
         ChangeNotifierProvider(create: (_) => LoadingChangeNotifier()),
         ChangeNotifierProvider(create: (_) => CameraReadyNotifier()),
         ChangeNotifierProvider(create: (_) => FileChangedNotifier()),
-        ChangeNotifierProvider(create: (_) => CroppedFileChangeNotifier())
+        ChangeNotifierProvider(create: (_) => CroppedFileChangeNotifier()),
+        ChangeNotifierProvider(create: (_) => ErrorNotifier())
       ],
       builder: (context, _) {
         _loader = Provider.of<LoadingChangeNotifier>(context);
         _cameraReady = Provider.of<CameraReadyNotifier>(context);
         _file = Provider.of<FileChangedNotifier>(context);
         _croppedFile = Provider.of<CroppedFileChangeNotifier>(context);
+        _error = Provider.of<ErrorNotifier>(context);
         return Stack(
           children: [
             Scaffold(
@@ -89,6 +92,7 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
                   _buildCropWidget(),
                   _buildCropImage(),
                   _buildHeader(),
+                  _buildMessages(),
                 ],
               ),
             ),
@@ -304,6 +308,8 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
   }
 
   void _takePicture() async {
+    _error?.clear();
+    // _error?.setValue('Bạn vui lòng chụp ảnh theo hướng dẫn');
     _loader?.showLoading();
     await _camera?.takePicture().then((v) {
       _camera?.pausePreview();
@@ -354,6 +360,38 @@ class SocialIdCameraState extends State<SocialIdCameraWidget>
       });
     });
     _loader?.hideLoading();
+  }
+
+  _buildMessages() {
+    print(rect);
+    return Consumer<ErrorNotifier>(builder: (context, error, _) {
+      return error.value.isEmpty
+          ? SizedBox()
+          : Positioned(
+              top: rect.top + rect.height + 25,
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width,
+                child: Column(
+                  children: [Text(error.value), Text("Xem hướng dẫn")],
+                ),
+              ));
+    });
+  }
+}
+
+class ErrorNotifier extends ChangeNotifier {
+  String? _value;
+
+  String get value => _value ?? '';
+
+  void setValue(String? value) {
+    _value = value;
+    notifyListeners();
+  }
+
+  void clear() {
+    _value = null;
+    notifyListeners();
   }
 }
 
